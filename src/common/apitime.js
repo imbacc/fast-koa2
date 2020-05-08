@@ -9,7 +9,7 @@
 const config = require('../db/config.js')
 const router = config.limit
 
-module.exports = async (fastify, spname, spid, time = 30, count = 10, update = false) => {
+module.exports = async (koa, spname, spid, time = 30, count = 10, update = false) => {
 	
 	//false为关闭redis限流
 	if(!config.apitime) return true
@@ -23,17 +23,17 @@ module.exports = async (fastify, spname, spid, time = 30, count = 10, update = f
 		time = cfg[0]
 		count = cfg[1]
 	}
-	
-	const api_time = await fastify.get_redis(key_id) 	//获取 访问API时间间隔
-	const api_count = await fastify.get_redis(key_id2) 	//获取 访问API次数间隔的时间
+    
+	const api_time = await koa.get_redis(key_id) 	//获取 访问API时间间隔
+	const api_count = await koa.get_redis(key_id2) 	//获取 访问API次数间隔的时间
 	const datestr = new Date().getTime()
 	
 	// console.log('api_time=',api_time)
 	// console.log('api_count=',api_count)
 
 	if (api_time === '' || api_time === null || api_count === undefined) {
-		fastify.set_redis(key_id, datestr, 60 * 10)
-		fastify.set_redis(key_id2, 1, 60 * 10)
+		koa.set_redis(key_id, datestr, 60 * 10)
+		koa.set_redis(key_id2, 1, 60 * 10)
 	} else {
 		//Api时间限制
 		let second = (datestr - parseInt(api_time)) / 1000
@@ -47,11 +47,11 @@ module.exports = async (fastify, spname, spid, time = 30, count = 10, update = f
 			if (add > count) {
 				return false
 			} else {
-				fastify.set_redis(key_id2, add, 60 * 10)
+				koa.set_redis(key_id2, add, 60 * 10)
 			}
 		} else {
-			fastify.set_redis(key_id, datestr, 60 * 10)
-			fastify.set_redis(key_id2, 1, 60 * 10)
+			koa.set_redis(key_id, datestr, 60 * 10)
+			koa.set_redis(key_id2, 1, 60 * 10)
 		}
 	}
 	

@@ -1,80 +1,92 @@
 const resultful = require('../db/resultful.js') //返回数据构造
 const apitime = require('./apitime.js') //API限流
+const bodyparser = require('koa-bodyparser')
 
 //检测CMAKE令牌
-const check_cmake = (koa, head, req, reply, code = 'SUCCESS', next) => {
+const check_cmake = async (koa, ctx, code = 'SUCCESS', next) => {
     if (code === 'JUMP_CHECK') {
         console.log('跳过检测 token...')
-        next()
+        await next()
         return
     }
 
-    console.log({
-        id: req.id,
-        code: code
-    }, '拦截状态...')
+    console.log({code: code}, '拦截状态...')
 
     if (code === 'SUCCESS') {
-        let md5 = reply.body ? reply.body.md5 : ''
-        let name = 'api_' + req.raw.originalUrl + md5
+        let md5 = ctx.request.body.md5 ? ctx.request.body.md5 : ''  //MD5加密body为了保证请求一致性存储
+        let name = 'api_' + ctx.originalUrl + md5
         console.log('api name=', name)
-
-        if (req.req.method === 'GET') {
+        if (ctx.request.method === 'GET') {
             //读取是否 接口有redis缓存
-            koa.get_redis(name).then((cache) => {
+            await koa.get_redis(name).then(async (cache) => {
                 if (cache) {
-                    reply.header('Cache-control', 'max-age=3600')
-                    reply.header('Last-Modified', new Date().toUTCString())
                     console.log('api cache=' + name)
-                    reply.send(cache)
-                } else {
-                    next()
+                    ctx.append('Cache-control','max-age=3600')
+                    ctx.append('Cache-control', 'max-age=3600')
+                    ctx.append('Last-Modified', new Date().toUTCString())
+                    ctx.send(cache)
+                }else{
+                    await next()
                 }
             })
-        } else {
+        }else{
             //POST请求跳过检测缓存直接执行
-            next()
+            await next()
         }
     } else {
-        reply.code(500).send(resultful(code))
+        ctx.code(500).send(resultful(code))
     }
 }
 
 //检测JWT令牌
-const check_jwt = (koa, head, req, reply, next) => {
-    req.jwtVerify((err, decoded) => {
+const check_jwt = async (koa, head, ctx, next) => {
+    let auth = head.authorization ? head.authorization.replace('Bearer ','') : ''  
+    await koa.jwtVerify(auth).then(async (err, decoded) => {
         //没有携带令牌时 判断是否时授权路由=> 检测true为是授予令牌的接口 ,否则返回状态码 WHEREIS_CRACK
-        let state = req.req.url.indexOf('version') !== -1 ? 'SUCCESS' : 'WHEREIS_CRACK'
-        if (decoded) state = 'SUCCESS'
-        check_cmake(koa, head, req, reply, state, next)
+        //检测是否是version 路由
+        let state = ctx.originalUrl.indexOf('version') !== -1 ? 'JUMP_CHECK' : 'WHEREIS_CRACK';
+        if(err && auth) {
+            ctx.code(403).send(resultful(err.name === 'JsonWebTokenError' ? 'UNMAKETOKEN_RUBBISH' : 'UNMAKETOKEN_ERROR'))
+            return
+        }
+        if(err === null) state = 'SUCCESS'
+        await check_cmake(koa, ctx, state, next)
     })
 }
 
 module.exports = (koa) => {
     console.log('开启拦截器...')
-
+    
+    koa.use(bodyparser())
     koa.use(async (ctx, next) => {
-        const { req,res } = ctx
-
-        let url = req.url
-        console.log(url)
-        if (url === '/favicon.ico') {
-            ctx.code(404).send()
-        } else {
-            console.log(ctx)
-            // console.log({ url: url, params: {...req.query}, body: req.body , id: req.id }, '请求拦截...')
-            // const head = req.headers
-
-            // apitime(koa,url,head.uuid).then((bool)=>{
-            //     if(!bool){
-            //         // console.log('终止请求...')
-            //         reply.send(resultful('API_OutTime'))
-            //     }else{
-            //         check_jwt(koa,head,req,reply,next)
-            //     }
-            // })
+        let req = ctx.request,
+        head = req.headers,
+        url = req.url,
+        params = ctx.query,
+        body = req.body
+        
+        try{
+            if (url === '/favicon.ico') {
+                console.log('/favicon.ico')
+                ctx.code(404).send()
+            } else {
+                console.log({ url: url, params: {...params}, body: body }, '请求拦截...')
+                
+                await apitime(koa,ctx.originalUrl).then(async (bool)=>{
+                    if(!bool){
+                        // console.log('终止请求...')
+                        ctx.send(resultful('API_OutTime'))
+                    }else{
+                        await check_jwt(koa,head,ctx,next)
+                    }
+                })
+            }
+        }catch(e){
+            if(e.toString().indexOf('结束请求') === -1) {
+                console.log(e)
+                ctx.code(500).send(e)
+            }
         }
         
-        await next()
     })
 }

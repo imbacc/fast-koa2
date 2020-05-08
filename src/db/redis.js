@@ -24,20 +24,16 @@ const set_redis = (key, value, time) => {
 	if(time) redis.expire(key, time)
 }
 
-const has_redis = async (key,two) => {
-	const p = new Promise((resolve, reject) => {
-		redis.get(key,(err, res) => resolve((res === two)))
-	})
+// const has_redis = async (key,two) => {
+// 	const p = new Promise((resolve, reject) => {
+// 		redis.get(key,(err, res) => resolve((res === two)))
+// 	})
 	
-	return await p.then((res) => res)
-}
+// 	return await p.then((res) => res)
+// }
 
-module.exports = (fastify) => {
-	// let d = await get_redis('cmaketoken_128589188387259.879530641')
-	// console.log('d=',d)
-	
-	fastify.decorate('get_redis', get_redis)
-	fastify.decorate('set_redis', set_redis)
-	fastify.decorate('has_redis', has_redis)
+module.exports = (koa) => {
+     koa.prototype.get_redis = get_redis
+     koa.prototype.set_redis = set_redis
 }
 

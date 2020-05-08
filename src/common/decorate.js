@@ -2,19 +2,30 @@ class chainThen {
     //写入send函数代替ctx.body, ctx.status赋值 链式调用
     constructor(ctx) {
        this.ctx = ctx
+       this.ctx.set('Content-Type', 'application/json')
     }
     
     send(val = ''){
-        console.log('send=', val)
-        this.ctx.body = val
-        throw '结束请求...'
+        try{
+            console.log('send=',val)
+            this.ctx.body = val
+            throw new Error('结束请求')
+        }catch(e){
+            //TODO handle the exception
+        }
     }
     
     code(val = 200) {
-        console.log('code=', val)
         this.ctx.status = val
         return this
     }
+}
+
+const _callsql = (sql,val,time,ctx,koa) => {
+    ctx.exec.call(sql,val,(res)=> {
+        if(res.code === 1) koa.set_redis(`api_${ctx.originalUrl}`, res, time) //默认360分钟一个小时 60 * 60
+        ctx.send(res)
+    })
 }
 
 module.exports = (koa) => {
@@ -22,19 +33,15 @@ module.exports = (koa) => {
 
     koa.context.config = { name: 'test' }
     
-    koa.use(async (ctx, next) => {
+    //带入code,send函数
+    koa.use(async (ctx,next) => {
         const then = new chainThen(ctx)
         koa.context.code = (val) => then.code(val)
-        koa.context.send = (val) => then.send(val)
+        koa.context.send = (val) => Promise.resolve(then.send(val))
+        koa.context.cache_sql = (sql,val,time = 1) => _callsql(sql,val,time,ctx,koa)
         
         await next()
     })
-
-    // fastify.decorate('fast_sql',(sql,val,time,fastify,req,reply) => {
-    // 	const exec = fastify.exec
-    // 	exec.call(sql,val,(res)=> {
-    // 		if(res.code === 1) fastify.set_redis(`api_${req.raw.url}`, res, time) //默认360分钟一个小时 60 * 60
-    // 		reply.send(res)
-    // 	})
-    // })
+    
+    
 }
