@@ -1,4 +1,4 @@
-# hey kong<br>
+hey kong<br>
 # 整理了架构
 
 ```
@@ -25,3 +25,5 @@
   ├── .gitignore                  忽略提交到git目录文件
   ├── package.json                依赖包及配置信息文件
 ```
+
+2003年秋 get it
