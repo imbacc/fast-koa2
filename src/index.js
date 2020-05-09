@@ -12,6 +12,7 @@ require('./db/mysql')(KOA_AK) 	    //注册Mysql
 require('./db/redis')(KOA_AK) 		//注册Redis
 
 try{
+    // 监听端口并启动
 	koa.listen(port, ip)
 	console.log(`服务指向IP: ${ip}`)
 	console.log(`服务监听端口: ${port}`)
