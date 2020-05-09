@@ -1,7 +1,7 @@
 const resultful = require('../db/resultful.js') //返回数据构造
 const apitime = require('./apitime.js') //API限流
 const bodyparser = require('koa-bodyparser')
-const md5 = require('js-md5')
+const md5 = require('md5-node')
 
 //检测CMAKE令牌
 const check_cmake = async (koa, ctx, code = 'SUCCESS', next) => {
@@ -15,14 +15,13 @@ const check_cmake = async (koa, ctx, code = 'SUCCESS', next) => {
 
     if (code === 'SUCCESS') {
         let onlyid = md5(ctx.request.headers.authorization) || ''
-        let name = 'api_' + ctx.originalUrl + onlyid
+        let name = 'api_'+ctx.originalUrl+'_'+onlyid
         console.log('api name=', name)
         if (ctx.request.method === 'GET') {
             //读取是否 接口有redis缓存
             await koa.get_redis(name).then(async (cache) => {
                 if (cache) {
                     console.log('api cache=' + name)
-                    ctx.append('Cache-control','max-age=3600')
                     ctx.append('Cache-control', 'max-age=3600')
                     ctx.append('Last-Modified', new Date().toUTCString())
                     ctx.send(cache)

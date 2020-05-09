@@ -7,7 +7,7 @@ class chainThen {
     
     send(val = ''){
         try{
-            console.log('send=',val)
+            // console.log('send=',val)
             this.ctx.body = val
             throw new Error('结束请求')
         }catch(e){
@@ -21,11 +21,11 @@ class chainThen {
     }
 }
 
-const md5 = require('js-md5')
+const md5 = require('md5-node')
 
 const _callsql = (sql,val,time,ctx,koa) => {
     return koa.exec.call_async(sql,val).then((res)=> {
-        let onlyid = md5(ctx.request.headers.authorization) || ''
+        const onlyid = md5(ctx.request.headers.authorization) || ''
         if(res.code === 1) koa.set_redis(`api_${ctx.originalUrl}_${onlyid}`, res, time) //默认360分钟一个小时 60 * 60
         return res
     })
