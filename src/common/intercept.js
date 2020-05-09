@@ -1,6 +1,7 @@
 const resultful = require('../db/resultful.js') //返回数据构造
 const apitime = require('./apitime.js') //API限流
 const bodyparser = require('koa-bodyparser')
+const md5 = require('js-md5')
 
 //检测CMAKE令牌
 const check_cmake = async (koa, ctx, code = 'SUCCESS', next) => {
@@ -13,8 +14,8 @@ const check_cmake = async (koa, ctx, code = 'SUCCESS', next) => {
     console.log({code: code}, '拦截状态...')
 
     if (code === 'SUCCESS') {
-        let md5 = ctx.request.body.md5 ? ctx.request.body.md5 : ''  //MD5加密body为了保证请求一致性存储
-        let name = 'api_' + ctx.originalUrl + md5
+        let onlyid = md5(ctx.request.headers.authorization) || ''
+        let name = 'api_' + ctx.originalUrl + onlyid
         console.log('api name=', name)
         if (ctx.request.method === 'GET') {
             //读取是否 接口有redis缓存
@@ -63,7 +64,8 @@ module.exports = (koa) => {
         head = req.headers,
         url = req.url,
         params = ctx.query,
-        body = req.body
+        body = req.body,
+        onlyid = md5(head.authorization)
         
         try{
             if (url === '/favicon.ico') {
@@ -72,7 +74,7 @@ module.exports = (koa) => {
             } else {
                 console.log({ url: url, params: {...params}, body: body }, '请求拦截...')
                 
-                await apitime(koa,ctx.originalUrl).then(async (bool)=>{
+                await apitime(koa,ctx.originalUrl,onlyid).then(async (bool)=>{
                     if(!bool){
                         // console.log('终止请求...')
                         ctx.send(resultful('API_OutTime'))

@@ -1,5 +1,5 @@
 class chainThen {
-    //写入send函数代替ctx.body, ctx.status赋值 链式调用
+    //写入send函数代替ctx.body, ctx.status赋值 可链式调用 ctx.code(200).send('xxx')
     constructor(ctx) {
        this.ctx = ctx
        this.ctx.set('Content-Type', 'application/json')
@@ -21,10 +21,13 @@ class chainThen {
     }
 }
 
+const md5 = require('js-md5')
+
 const _callsql = (sql,val,time,ctx,koa) => {
-    ctx.exec.call(sql,val,(res)=> {
-        if(res.code === 1) koa.set_redis(`api_${ctx.originalUrl}`, res, time) //默认360分钟一个小时 60 * 60
-        ctx.send(res)
+    return koa.exec.call_async(sql,val).then((res)=> {
+        let onlyid = md5(ctx.request.headers.authorization) || ''
+        if(res.code === 1) koa.set_redis(`api_${ctx.originalUrl}_${onlyid}`, res, time) //默认360分钟一个小时 60 * 60
+        return res
     })
 }
 
@@ -42,6 +45,4 @@ module.exports = (koa) => {
         
         await next()
     })
-    
-    
 }
